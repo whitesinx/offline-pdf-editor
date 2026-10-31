@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Offline PDF Editor</title>
+	<link rel="stylesheet" href="src/style.css">
+	<script src="vendor/tesseract/tesseract.min.js"></script>
+	<script type="module" src="src/app.js"></script>
+</head>
+<body>
+	<header class="toolbar">
+		<div class="brand">PDF Editor <span class="tag">offline</span></div>
+		<label class="btn primary">
+			Open PDF
+			<input id="file" type="file" accept="application/pdf,.pdf" hidden>
+		</label>
+		<div class="group" data-needs-doc>
+			<button class="btn" id="zoom-out" title="Zoom out">−</button>
+			<span id="zoom-label" class="zoom">100%</span>
+			<button class="btn" id="zoom-in" title="Zoom in">+</button>
+		</div>
+		<label class="toggle" data-needs-doc>
+			<input type="checkbox" id="show-boxes" checked> Show text boxes
+		</label>
+		<button class="btn" id="ocr-all" data-needs-doc hidden>OCR scanned pages</button>
+		<div class="spacer"></div>
+		<button class="btn" id="undo" data-needs-doc disabled title="Undo (⌘Z)">Undo</button>
+		<button class="btn primary" id="download" data-needs-doc title="Save (⌘S)">Download PDF</button>
+	</header>
+
+	<main id="viewer">
+		<div id="drop" class="drop">
+			<div class="drop-inner">
+				<h1>Edit PDF text in place</h1>
+				<p>Drop a PDF here or use <b>Open PDF</b>. Everything runs in this browser and nothing is uploaded.</p>
+				<ul>
+					<li>Click any line of text to edit it. Press <kbd>Enter</kbd> to apply or <kbd>Esc</kbd> to cancel.</li>
+					<li>Images, vector graphics and untouched text stay exactly as they were.</li>
+					<li>Scanned pages are detected automatically. Run OCR on them to make them editable.</li>
+				</ul>
+			</div>
+		</div>
+		<div id="pages"></div>
+	</main>
+
+	<footer id="status" class="status">Loading engine…</footer>
+</body>
+</html>

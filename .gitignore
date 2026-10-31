@@ -1,0 +1,14 @@
+# Local Python environment (created by serve.py)
+.venv/
+__pycache__/
+*.pyc
+
+# Font cache: copies of fonts installed on this computer / downloaded fonts.
+# Not redistributable, and the metadata contains local file paths.
+fonts/
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
