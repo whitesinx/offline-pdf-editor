@@ -12,28 +12,78 @@
 	<header class="toolbar">
 		<div class="brand">PDF Editor <span class="tag">offline</span></div>
 		<label class="btn primary">
-			Open PDF
-			<input id="file" type="file" accept="application/pdf,.pdf" hidden>
+			Open
+			<input id="file" type="file" multiple accept="application/pdf,.pdf,image/*,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.heic" hidden>
 		</label>
 		<div class="group" data-needs-doc>
 			<button class="btn" id="zoom-out" title="Zoom out">−</button>
 			<span id="zoom-label" class="zoom">100%</span>
 			<button class="btn" id="zoom-in" title="Zoom in">+</button>
 		</div>
-		<label class="toggle" data-needs-doc>
-			<input type="checkbox" id="show-boxes" checked> Show text boxes
-		</label>
+		<div class="seg-toggle" id="unit" data-needs-doc role="group" aria-label="Edit by">
+			<button class="on" data-unit="line" title="Click a line to edit just that line (L)">Lines</button>
+			<button data-unit="para" title="Click a paragraph or list item to edit it as a whole; it re-wraps (P)">Paragraphs</button>
+		</div>
+		<details class="menu" data-needs-doc>
+		<summary class="btn" title="How new text is drawn. Applies to the next edits.">Text look ▾</summary>
+		<div class="menu-panel look">
+			<label class="toggle" title="Highlight the text you can click to edit">
+				<input type="checkbox" id="show-boxes" checked> Highlight editable text
+			</label>
+			<label class="toggle" title="Scanned pages: measure how soft and faded the original text is and make the new text match">
+				<input type="checkbox" id="look-match" checked> Match original
+			</label>
+			<label class="toggle" title="Gaussian blur of the new text (ignored when Match original is used on a scanned line)">
+				Blur <input type="range" id="look-blur" min="0" max="100" step="5" value="0">
+			</label>
+			<label class="toggle" title="Lower resolution, uneven ink and a slight fade, like an old print or photocopy">
+				Aged <input type="range" id="look-aged" min="0" max="100" step="5" value="0">
+			</label>
+		</div>
+		</details>
 		<button class="btn" id="ocr-all" data-needs-doc hidden>OCR scanned pages</button>
 		<div class="spacer"></div>
-		<button class="btn" id="undo" data-needs-doc disabled title="Undo (⌘Z)">Undo</button>
-		<button class="btn primary" id="download" data-needs-doc title="Save (⌘S)">Download PDF</button>
+		<button class="btn" id="text-mode" data-needs-doc title="Write text anywhere on a page (T)">Text</button>
+		<details class="menu" id="sign-menu" data-needs-doc>
+			<summary class="btn" title="Sign the document (S)">Sign ▾</summary>
+			<div class="menu-panel right">
+				<button class="menu-item" id="sign-place"><strong>Place signature</strong><small>Click on a page to put it there</small></button>
+				<button class="menu-item" id="sign-new"><strong>New signature…</strong><small>Draw it, or use a photo of it</small></button>
+			</div>
+		</details>
+		<button class="btn" id="whiteout-mode" data-needs-doc title="Drag over anything to cover it (W)">Whiteout</button>
+		<button class="btn" id="comment-mode" data-needs-doc title="Place a comment anywhere on a page (C)">Comment</button>
+		<button class="btn" id="comments-toggle" data-needs-doc title="Show all comments">Comments</button>
+		<div class="group" data-needs-doc>
+			<button class="btn icon-btn" id="undo" disabled title="Undo (⌘Z)" aria-label="Undo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+			<button class="btn icon-btn" id="redo" disabled title="Redo (⌘⇧Z)" aria-label="Redo"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 14 5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+		</div>
+		<details class="menu download-menu" data-needs-doc>
+			<summary class="btn primary" title="Save (⌘S)">Download ▾</summary>
+			<div class="menu-panel right">
+				<button class="menu-item" data-format="pdf"><strong>PDF document</strong><small>.pdf · text stays editable, keeps comments</small></button>
+				<button class="menu-item" data-format="png"><strong>PNG image</strong><small>.png · sharp, lossless</small></button>
+				<button class="menu-item" data-format="jpg"><strong>JPEG image</strong><small>.jpg · smaller file</small></button>
+				<label class="menu-field">Image size
+					<select id="export-res">
+						<option value="original">Original size</option>
+						<option value="96">96 dpi (screen)</option>
+						<option value="150">150 dpi</option>
+						<option value="300">300 dpi (print)</option>
+					</select>
+				</label>
+				<p class="menu-note">Images include edits and text boxes. Comments are only kept in the PDF. Several pages download as a .zip.</p>
+			</div>
+		</details>
 	</header>
 
+	<input id="insert-file" type="file" multiple accept="application/pdf,.pdf,image/*,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.gif,.webp,.heic" hidden>
+	<div class="workspace">
 	<main id="viewer">
 		<div id="drop" class="drop">
 			<div class="drop-inner">
 				<h1>Edit PDF text in place</h1>
-				<p>Drop a PDF here or use <b>Open PDF</b>. Everything runs in this browser and nothing is uploaded.</p>
+				<p>Drop a PDF or an image (PNG, JPG, TIFF…) here, or use <b>Open</b>. Select several files to merge them into one document. Images are converted to PDF automatically. Everything runs in this browser and nothing is uploaded.</p>
 				<ul>
 					<li>Click any line of text to edit it. Press <kbd>Enter</kbd> to apply or <kbd>Esc</kbd> to cancel.</li>
 					<li>Images, vector graphics and untouched text stay exactly as they were.</li>
@@ -43,6 +93,8 @@
 		</div>
 		<div id="pages"></div>
 	</main>
+	<aside id="comments-panel" class="comments-panel" aria-label="Comments"></aside>
+	</div>
 
 	<footer id="status" class="status">Loading engine…</footer>
 </body>

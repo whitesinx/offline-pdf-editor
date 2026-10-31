@@ -54,10 +54,14 @@ function splitAtGaps(ln) {
 	const words = (ln.words || []).filter((w) => w.text.trim());
 	if (!words.length) return [];
 	const height = median(words.map(wordHeight));
+	const gaps = words.slice(1).map((w, i) => w.bbox.x0 - words[i].bbox.x1);
+	// Justified text has evenly wide gaps: only a gap much wider than the line's
+	// usual word spacing splits it.
+	const usual = gaps.length >= 2 ? [...gaps].sort((a, b) => a - b)[(gaps.length - 1) >> 1] : 0;
 	const runs = [[words[0]]];
 	for (let i = 1; i < words.length; i++) {
-		const gap = words[i].bbox.x0 - words[i - 1].bbox.x1;
-		if (gap > height * 0.9) runs.push([]);
+		const gap = gaps[i - 1];
+		if (gap > height * 0.9 && gap > usual * 2) runs.push([]);
 		runs[runs.length - 1].push(words[i]);
 	}
 	return runs.map(dropIcons).filter((r) => r.length);
@@ -66,20 +70,59 @@ function splitAtGaps(ln) {
 const wordHeight = (w) => w.bbox.y1 - w.bbox.y0;
 const median = (xs) => [...xs].sort((a, b) => a - b)[xs.length >> 1];
 
-// Icons next to text (pins, dots, chevrons) get OCR'd as junk like "Le)" or "©".
-// Strip such words from the ends: unsure and taller than the text, or no letters/digits.
+// Icons next to text (copy, pins, dots, chevrons) get OCR'd as junk like "O)", "Le)" or "©".
+// Strip such words from the ends of a run so they never become part of an editable line.
 function dropIcons(words) {
-	const isIcon = (w, others) => {
-		if (!others.length) return false;
-		const h = median(others.map(wordHeight));
-		if (!/[\p{L}\p{N}]/u.test(w.text)) return true;
-		if (w.confidence < 50) return true;
-		return w.confidence < 85 && wordHeight(w) > h * 1.25;
-	};
 	words = [...words];
-	while (words.length > 1 && isIcon(words[0], words.slice(1))) words.shift();
-	while (words.length > 1 && isIcon(words[words.length - 1], words.slice(0, -1))) words.pop();
+	while (words.length > 1 && isIcon(words[0], words.slice(1), "start")) words.shift();
+	while (words.length > 1 && isIcon(words[words.length - 1], words.slice(0, -1), "end")) words.pop();
 	return words;
+}
+
+const OPENERS = "([{<", CLOSERS = ")]}>";
+// Characters that real text rarely has in a short standalone token.
+const SYMBOLS = /[©®™°@*~^\\/|¢§¶•·«»‹›□■◯○●◻◼☐✓✔✗✘→←↑↓⇧⧉]/u;
+
+function isIcon(w, others, side) {
+	if (!others.length) return false;
+	const text = w.text.trim();
+	const alnum = (text.match(/[\p{L}\p{N}]/gu) || []).length;
+	const h = median(others.map(wordHeight));
+
+	// A small dash or bullet starting a line is a list marker, not an icon.
+	if (side === "start" && /^[-–—•●▪◦‣*·]$/.test(text) && wordHeight(w) <= h) return false;
+	if (alnum === 0) return true;
+	if (w.confidence < 50) return true;
+	if (w.confidence < 85 && wordHeight(w) > h * 1.25) return true;
+
+	// The checks below only apply to short tokens. Long words are real text.
+	if (text.length > 3) return false;
+
+	// A stray symbol in a tiny token: "©", "O@", "#1"-like junk around an icon.
+	if (alnum <= 1 && SYMBOLS.test(text)) return true;
+
+	// Unbalanced bracket with no partner in the rest of the line. A closer at the end
+	// ("O)", "Le)") or an opener at the start ("(o") usually comes from an icon's outline.
+	// "(a)" and "x)" after an earlier "(" are kept. "1)" at the start of a line is a list marker.
+	const rest = others.map((o) => o.text).join(" ");
+	const unbalanced = (open, close) => {
+		const o = [...text].filter((c) => c === open).length;
+		const c = [...text].filter((ch) => ch === close).length;
+		return o !== c;
+	};
+	for (let k = 0; k < OPENERS.length; k++) {
+		const op = OPENERS[k], cl = CLOSERS[k];
+		if (!unbalanced(op, cl)) continue;
+		if (side === "end" && text.includes(cl) && !rest.includes(op)) return true;
+		if (side === "start" && text.includes(op) && !rest.includes(cl)) return true;
+	}
+
+	// Tesseract unsure about some of the glyphs in a tiny token: it's probably a shape, not letters.
+	const symConf = (w.symbols || []).map((s) => s.confidence);
+	if (symConf.length && Math.min(...symConf) < 60) return true;
+
+	// Squarish blob noticeably taller than the text with only one or two "letters".
+	return alnum <= 2 && w.confidence < 95 && wordHeight(w) > h * 1.12;
 }
 
 function toPageLine(ln, words, text, img, scale, id) {
@@ -130,8 +173,9 @@ function inkMask(img, x0, y0, x1, y1, background, ink, scale) {
 	return { width, height, data, left, top, scale };
 }
 
-// Paper color = median of the pixels just outside the box; ink = mean of
-// the darkest tenth of pixels inside it (anti-aliased edges excluded).
+// Paper color = median of the pixels just outside the box; ink = mean of the
+// tenth of pixels inside it that differ most from the paper (anti-aliased edges
+// excluded). That works for dark-on-light and light-on-dark (screenshots, dark UIs).
 function sampleColors(img, x0, y0, x1, y1) {
 	const { width, height, data } = img;
 	const px = (x, y) => {
@@ -150,9 +194,10 @@ function sampleColors(img, x0, y0, x1, y1) {
 
 	const inside = [];
 	for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) inside.push(px(x, y));
-	inside.sort((a, b) => lum(a) - lum(b));
-	const dark = inside.slice(0, Math.max(1, inside.length / 10));
-	const ink = [0, 1, 2].map((k) => dark.reduce((s, c) => s + c[k], 0) / dark.length);
+	const dist = (c) => Math.hypot(c[0] - bg[0], c[1] - bg[1], c[2] - bg[2]);
+	inside.sort((a, b) => dist(b) - dist(a));
+	const far = inside.slice(0, Math.max(1, Math.round(inside.length / 10)));
+	const ink = [0, 1, 2].map((k) => far.reduce((s, c) => s + c[k], 0) / far.length);
 
 	return { background: bg.map((v) => v / 255), ink: ink.map((v) => v / 255) };
 }
