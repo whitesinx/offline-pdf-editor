@@ -26,7 +26,9 @@ def ensure_dependencies():
         return
     except ImportError:
         pass
-    venv_python = os.path.join(VENV, "Scripts" if os.name == "nt" else "bin", "python")
+    venv_python = os.path.join(
+        VENV, "Scripts" if os.name == "nt" else "bin", "python.exe" if os.name == "nt" else "python"
+    )
     if os.path.abspath(sys.executable) == os.path.abspath(venv_python):
         print("Installing font tools:", ", ".join(REQUIREMENTS))
         subprocess.check_call([venv_python, "-m", "pip", "install", "-q", *REQUIREMENTS])
@@ -34,6 +36,10 @@ def ensure_dependencies():
     if not os.path.exists(venv_python):
         print("Creating local Python environment in .venv …")
         subprocess.check_call([sys.executable, "-m", "venv", VENV])
+    if os.name == "nt":
+        # os.execv() on Windows mangles argv when a path contains spaces
+        # (e.g. "C:\Users\me\My Project"), so re-launch as a subprocess instead.
+        sys.exit(subprocess.call([venv_python, os.path.abspath(__file__), *sys.argv[1:]]))
     os.execv(venv_python, [venv_python, os.path.abspath(__file__), *sys.argv[1:]])
 
 
