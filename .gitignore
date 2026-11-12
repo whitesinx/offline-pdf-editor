@@ -1,5 +1,6 @@
 # Local Python environment (created by serve.py)
 .venv/
+.venv-markitdown/
 __pycache__/
 *.pyc
 

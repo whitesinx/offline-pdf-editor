@@ -20,6 +20,12 @@ installs `fonttools` + `brotli`. The internet is only used to download fonts fro
   from an image, so a 780×300 PNG comes back as 780×300), 96, 150 or 300 dpi. Images include edits and text
   boxes; comments are only kept in the PDF. Several pages download as a .zip of page images.
   ⌘S saves in the format you opened (PDF, PNG or JPG).
+- **Markdown**: *Download ▾ → Markdown* converts the edited PDF to a `.md` file with
+  [MarkItDown](https://github.com/microsoft/markitdown) (text, headings, lists and tables). It runs on the local
+  server, not in the browser. MarkItDown needs Python 3.10+, so on first use `serve.py` creates
+  `.venv-markitdown/` (with `uv` when installed, otherwise any Python 3.10+ on PATH) and installs
+  `markitdown[pdf]`; that first install needs the internet. Scanned pages have no text layer, so only the lines
+  you edited after OCR come through.
 
 ## How quality is preserved
 

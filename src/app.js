@@ -810,6 +810,7 @@ function download(format = defaultFormat()) {
 			state.dirty = false;
 			return;
 		}
+		if (format === "md") return downloadMarkdown(base);
 		status(`Rendering ${format.toUpperCase()}…`);
 		const res = exportRes.value;
 		// "Original size": pages made from an image keep its pixel size, other pages use 150 dpi.
@@ -826,6 +827,24 @@ function download(format = defaultFormat()) {
 	} catch (err) {
 		console.error(err);
 		status(`Save failed: ${err.message}`, true);
+	}
+}
+
+// Markdown is made by MarkItDown on the local server (serve.py) from the edited PDF.
+async function downloadMarkdown(base) {
+	status("Converting to Markdown… (the first time also installs MarkItDown)");
+	try {
+		const res = await fetch("/api/markdown", { method: "POST", headers: { "Content-Type": "application/pdf" }, body: state.engine.save() });
+		if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `server error ${res.status}`);
+		const bytes = new Uint8Array(await res.arrayBuffer());
+		if (!new TextDecoder().decode(bytes).trim()) {
+			status("No text found to convert. Scanned pages need their text edited after OCR to have a text layer.", true);
+			return;
+		}
+		saveFile(bytes, `${base}.md`, "text/markdown");
+	} catch (err) {
+		console.error(err);
+		status(`Markdown failed: ${err.message}`, true);
 	}
 }
 
